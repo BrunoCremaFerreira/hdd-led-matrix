@@ -27,21 +27,21 @@ _show_animation()
 
 _test_matrix()
 {
-    echo "Simulatind disk error:"
+    echo "Simulating disk error:"
     echo "  .   *   .   ."
     echo "  *   .   .   ." 
     echo "  .   .   *   ."
     _show_disk_error "0100 1000 0010"
     sleep 10
 
-    echo "Simulatind disk Installed Position:"
+    echo "Simulating disk Installed Position:"
     echo "  *   .   *   *"
     echo "  .   *   *   *" 
     echo "  *   *   .   *"
     _show_installed_disks "1011 0111 1101"
     sleep 10
 
-    echo "Simulatind disk normal activiti"
+    echo "Simulating normal disk activity"
     _show_animation
 
     echo "Done."
