@@ -5,12 +5,11 @@
 
 #define ROWS 3
 #define COLS 4
-#define FRAME_TIME 90 // in milliseconds
+#define DEFAULT_FRAME_TIME 90 // in milliseconds
 
 int cathodes[ROWS] = { 2, 4, 6 };
 int anodes[COLS]   = { 3, 5, 7, 9 };
 int slide = 0;
-int display_mode = 0;
 
 bool mx_animation_pattern[ROWS][COLS] = {
   {1, 0, 1, 0},
@@ -80,12 +79,14 @@ void show_disks_position()
   }  
 }
 
-void set_disks_position(String str_command)
+void set_disks_position(String str_matrix_data)
 {
+    clear_mx_disks_position();
+    
     int i = 0;
     int j = 0;
-    for(int s=4; s < str_command.length() && i < ROWS; s++) {
-        char chr = str_command[s];
+    for(int s=0; s < str_matrix_data.length() && i < ROWS; s++) {
+        char chr = str_matrix_data[s];
         
         if(chr != '0' && chr != '1') { 
           continue;
@@ -101,7 +102,7 @@ void set_disks_position(String str_command)
     }
 }
 
-void read_serial_input()
+int read_serial_input()
 {
   if(Serial.available() <= 0) {
     return;
@@ -110,21 +111,21 @@ void read_serial_input()
   String str_command = Serial.readStringUntil('\n');
 
   // Disk Error Mode
-  if(str_command.startsWith("err;")) {
-    clear_mx_disks_position();
-    set_disks_position(str_command);
-    display_mode = 1;
-    return;
+  if(str_command.startsWith("err:")) {
+    String matrix_data = str_command.substring(4);
+    set_disks_position(matrix_data);
+    return 1;
   }
   
   // Show Used Disks
-  if(str_command == "disks;") {
-    display_mode = 2;
-    return;
+  if(str_command.startsWith("disks:")) {
+    String m_data = str_command.substring(6);
+    set_disks_position(m_data);
+    return 2;
   }
 
   // Default
-  display_mode = 0;
+  return 0;
 }
 
 void setup()
@@ -147,7 +148,7 @@ void setup()
  
 void loop()
 {
-  read_serial_input();
+  int display_mode = read_serial_input();
 
   switch (display_mode)
   {
@@ -157,14 +158,15 @@ void loop()
       break;
     // Show disk position
     case 2:
+      show_disks_position();
       break;
     // Default animation
     default:
-      run_animation();  
+      run_animation();
       break;
   }
 
-  delay(FRAME_TIME);
+  delay(DEFAULT_FRAME_TIME);
   
   // Rendering on physical led matrix
   for ( int i = 0; i < ROWS; i++ )
