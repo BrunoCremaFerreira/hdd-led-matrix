@@ -19,12 +19,22 @@ bool mx_animation_pattern[ROWS][COLS] = {
 };
 
 bool mx[ROWS][COLS] = {};
+bool mx_disks_position[ROWS][COLS] = {};
 
 void clear()
 {
   for (int i = 0; i < ROWS ; ++i) {
     for (int j = 0; j < COLS ; ++j) {
       mx[i][j] = 0;
+    }
+  }
+}
+
+void clear_mx_disks_position()
+{
+  for (int i = 0; i < ROWS ; ++i) {
+    for (int j = 0; j < COLS ; ++j) {
+      mx_disks_position[i][j] = 0;
     }
   }
 }
@@ -47,7 +57,7 @@ void run_animation_blink_all()
 {
   slide++;
   if (slide < 10) {
-    clear();
+    show_disks_position();
     return;
   }
 
@@ -61,6 +71,36 @@ void run_animation_blink_all()
     slide = 0;
 }
 
+void show_disks_position()
+{
+  for (int i = 0; i < ROWS ; ++i) {
+    for (int j = 0; j < COLS ; ++j) {
+      mx[i][j] = mx_disks_position[i][j];
+    }
+  }  
+}
+
+void set_disks_position(String str_command)
+{
+    int i = 0;
+    int j = 0;
+    for(int s=4; s < str_command.length() && i < ROWS; s++) {
+        char chr = str_command[s];
+        
+        if(chr != '0' && chr != '1') { 
+          continue;
+        }
+
+        mx_disks_position[i][j] = (chr=='1');
+        
+        j++;
+        if(j == COLS) {
+          j=0;
+          i++;
+        }
+    }
+}
+
 void read_serial_input()
 {
   if(Serial.available() <= 0) {
@@ -69,12 +109,16 @@ void read_serial_input()
 
   String str_command = Serial.readStringUntil('\n');
 
+  // Disk Error Mode
   if(str_command.startsWith("err;")) {
+    clear_mx_disks_position();
+    set_disks_position(str_command);
     display_mode = 1;
     return;
   }
   
-  if(str_command == "disks;"){
+  // Show Used Disks
+  if(str_command == "disks;") {
     display_mode = 2;
     return;
   }
