@@ -79,7 +79,7 @@ _load_configurations()
     local cfg_file="hddlmx.conf"
 
     if [ ! -f "$cfg_file" ]; then
-        echo "O arquivo de configuração não foi encontrado."
+        echo "The hddlmx.conf configuration file was not found!"
         exit 1
     fi
 
