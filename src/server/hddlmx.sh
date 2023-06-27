@@ -1,29 +1,24 @@
 #!/bin/bash
 
-_get_device_names()
-{
-    lsblk --output name --nodeps --sort NAME --include 8 -nd
-}
-
 _show_disk_error()
 {
-    stty -F /dev/ttyACM0 -hupcl
+    stty -F $hdd_led_matrix_device -hupcl
     echo "err:$1" > $hdd_led_matrix_device
 }
 
 _show_installed_disks()
 {
-    stty -F /dev/ttyACM0 -hupcl
+    stty -F $hdd_led_matrix_device -hupcl
     echo "disks:$1" > $hdd_led_matrix_device
 }
 
 _show_animation()
 {
-    stty -F /dev/ttyACM0 -hupcl
+    stty -F $hdd_led_matrix_device -hupcl
     echo "0" > $hdd_led_matrix_device
 }
 
-_check_if_disks_is_present()
+_check_if_disks_are_present()
 {  
     local has_error=0
 
@@ -47,12 +42,36 @@ _check_if_disks_is_present()
     done
 
     if [[ $has_error == 1 ]]; then
-        echo "$matrix_data"
+        echo "Error output: $matrix_data"
         _show_disk_error "$matrix_data"
         return 1
     fi
 
     return 0
+}
+
+_check_if_disk_failed_on_syslog()
+{
+    local syslog=""
+
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        syslog="/var/log/syslog"
+    elif [[ "$OSTYPE" == "freebsd"* ]]; then
+        syslog="/var/log/messages"
+    else
+        echo "Current OS is not supported!"
+        exit 1
+    fi
+
+    # Search for disk errors on syslog
+    local failures=$(grep -i "error" "$syslog" | grep -iE /dev/"$os_disk_pattern")
+
+    if [[ -n "$failures" ]]; then
+        echo "Failures found:"
+        echo "$failures"
+    else
+        echo "No disk failures found in syslog."
+    fi    
 }
 
 _load_configurations()
@@ -91,12 +110,40 @@ _test_matrix()
     echo "Done."
 }
 
+_show_help()
+{
+    echo "+------------Help------------+"
+    echo "      -a  Matrix animation"
+    echo "      -e  Check for disk errors"
+    echo "      -h  Help"
+    echo "      -i  Show installed disks"
+    echo "      -t  Test the matrix"
+}
+
+_check_for_disk_errors()
+{
+    _check_if_disks_are_present
+    if [[ $? == 1 ]]; then
+    echo ""
+    #    exit 0
+    fi
+
+    _check_if_disk_failed_on_syslog
+}
+
 _main()
 {
     _load_configurations
-    _check_if_disks_is_present
-    sleep 10
-    _test_matrix
+    
+    case $1 in
+        -a) _show_animation ;;
+        -e) _check_for_disk_errors ;;
+        -i) _show_installed_disks ;;
+        -t) _test_matrix ;;
+         *)
+            _show_help
+            ;;
+    esac
 }
 
 _main $1
