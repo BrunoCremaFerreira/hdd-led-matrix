@@ -18,6 +18,15 @@ _show_animation()
     echo "0" > $hdd_led_matrix_device
 }
 
+_check_root_access()
+{
+  # Check is the current user is root
+    if [[ $EUID -ne 0 ]]; then
+        echo "This script needs to be run as root."
+        exit 1
+    fi  
+}
+
 _perform_or_operation() 
 {
   local string1=$1
@@ -56,7 +65,7 @@ _perform_or_operation()
 _check_if_disks_are_present()
 {  
     # List all disks installed
-    local hds_instalados=$(ls /dev/$os_disk_pattern 2>/dev/null)
+    local installed_disks=$(ls /dev/$os_disk_pattern 2>/dev/null)
 
     # Define initial value to matrix_data
     local matrix_data="$disk_position_matrix"
@@ -66,7 +75,7 @@ _check_if_disks_are_present()
 
     # Change disk names from initial matrix_data
     for hd in $hds_string; do
-    if [[ $hds_instalados =~ $hd ]]; then
+    if [[ $installed_disks =~ $hd ]]; then
         matrix_data="${matrix_data//$hd/0}"
     else
         matrix_data="${matrix_data//$hd/1}"
@@ -95,12 +104,6 @@ _replace_disks() {
 
 _check_if_disk_failed_with_smartctl()
 {
-    # Check is the current user is root
-    if [[ $EUID -ne 0 ]]; then
-        echo "This script needs to be run as root."
-        exit 1
-    fi
-
     # Run smartctl command to list disks with errors
     local disks_with_errors=$(smartctl --scan | awk '{print $1}' | xargs -I {} smartctl -H {} | awk '/^SMART overall-health self-assessment test result/ { if ($NF != "PASSED") print FILENAME }' | grep -oE '[a-z]+$')
 
@@ -156,6 +159,7 @@ _show_help()
 
 _check_for_disk_errors()
 {
+    _check_root_access
     local err_mx_1=$(_check_if_disks_are_present)
     local err_mx_2=$(_check_if_disk_failed_with_smartctl)
     echo "$err_mx_2" #============>TODO: Continue from here... 06/28/2023 [Bruno Crema Ferreira]
