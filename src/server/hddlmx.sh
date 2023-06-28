@@ -178,7 +178,10 @@ _main()
     case $1 in
         -a) _show_animation ;;
         -e) _check_for_disk_errors ;;
-        -i) _show_installed_disks ;;
+        -i) 
+            local mx_installed_disks=$(echo "$disk_position_matrix" | sed "s/$os_disk_pattern/1/g")
+            echo "$mx_installed_disks"
+            _show_installed_disks "$mx_installed_disks";;
         -t) _test_matrix ;;
          *)
             _show_help
