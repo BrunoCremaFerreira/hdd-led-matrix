@@ -18,10 +18,43 @@ _show_animation()
     echo "0" > $hdd_led_matrix_device
 }
 
+_perform_or_operation() 
+{
+  local string1=$1
+  local string2=$2
+  local result=""
+
+  # Splits strings into arrays, removing non-numeric characters
+  array1=($(echo "$string1" | tr -cd '0-1 '))
+  array2=($(echo "$string2" | tr -cd '0-1 '))
+
+  # Check the size of arrays
+  size1=${#array1[@]}
+  size2=${#array2[@]}
+
+  # Checks if arrays are the same size
+  if [[ $size1 -ne $size2 ]]; then
+    echo "Strings have different lengths. Unable to perform the operation."
+    return
+  fi
+
+  # Performs the OR operation on the numbers 0 and 1
+  for ((i=0; i<size1; i++)); do
+    if [[ ${array1[i]} -eq 1 || ${array2[i]} -eq 1 ]]; then
+      result+="1,"
+    else
+      result+="0,"
+    fi
+  done
+
+  # Remove the final comma
+  result=${result%,}
+
+  echo "$result"
+}
+
 _check_if_disks_are_present()
 {  
-    local has_error=0
-
     # List all disks installed
     local hds_instalados=$(ls /dev/$os_disk_pattern 2>/dev/null)
 
@@ -37,41 +70,42 @@ _check_if_disks_are_present()
         matrix_data="${matrix_data//$hd/0}"
     else
         matrix_data="${matrix_data//$hd/1}"
-        has_error=1
     fi
     done
 
-    if [[ $has_error == 1 ]]; then
-        echo "Error output: $matrix_data"
-        _show_disk_error "$matrix_data"
-        return 1
-    fi
-
-    return 0
+    echo "$matrix_data"
 }
 
-_check_if_disk_failed_on_syslog()
-{
-    local syslog=""
+_replace_disks() {
+  local disks=$1
+  local result=$2
 
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        syslog="/var/log/syslog"
-    elif [[ "$OSTYPE" == "freebsd"* ]]; then
-        syslog="/var/log/messages"
+  # Iterates over the disks in the string
+  for disk in $(echo "$disks" | tr ' ' '\n'); do
+    # Checks if the disk exists in the variable disks_with_errors
+    if [[ $disks =~ $disk ]]; then
+      result=$(echo "$result" | sed "s/$disk/1/g")
     else
-        echo "Current OS is not supported!"
+      result=$(echo "$result" | sed "s/$disk/0/g")
+    fi
+  done
+
+  echo "$result"
+}
+
+_check_if_disk_failed_with_smartctl()
+{
+    # Check is the current user is root
+    if [[ $EUID -ne 0 ]]; then
+        echo "This script needs to be run as root."
         exit 1
     fi
 
-    # Search for disk errors on syslog
-    local failures=$(grep -i "error" "$syslog" | grep -iE /dev/"$os_disk_pattern")
+    # Run smartctl command to list disks with errors
+    local disks_with_errors=$(smartctl --scan | awk '{print $1}' | xargs -I {} smartctl -H {} | awk '/^SMART overall-health self-assessment test result/ { if ($NF != "PASSED") print FILENAME }' | grep -oE '[a-z]+$')
 
-    if [[ -n "$failures" ]]; then
-        echo "Failures found:"
-        echo "$failures"
-    else
-        echo "No disk failures found in syslog."
-    fi    
+    local result=$(_replace_disks "$disks_with_errors" "$disk_position_matrix")
+    echo "$result"
 }
 
 _load_configurations()
@@ -122,13 +156,15 @@ _show_help()
 
 _check_for_disk_errors()
 {
-    _check_if_disks_are_present
-    if [[ $? == 1 ]]; then
-    echo ""
-    #    exit 0
+    local err_mx_1=$(_check_if_disks_are_present)
+    local err_mx_2=$(_check_if_disk_failed_with_smartctl)
+    echo "$err_mx_2" #============>TODO: Continue from here... 06/28/2023 [Bruno Crema Ferreira]
+    local or_result=$(_perform_or_operation "$err_mx_1" "$err_mx_2")
+    if [[ $or_result == *"1"* ]]; then
+        _show_disk_error "$or_result"
+    else
+        echo "No errors was found."
     fi
-
-    _check_if_disk_failed_on_syslog
 }
 
 _main()
